@@ -1,4 +1,4 @@
-import pygame
+import pygameweb as pygame
 import random
 import webbrowser
 import os
@@ -681,5 +681,6 @@ while running:
     
     # Установка частоты кадров
     clock.tick(FPS)
+
 
 pygame.quit()
