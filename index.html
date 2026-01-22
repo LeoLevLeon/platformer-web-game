@@ -349,7 +349,7 @@
             updateLoading('Устанавливаем PyGame Community Edition...');
             const micropip = pyodide.pyimport("micropip");
             // Устанавливаем специальную версию Pygame для WebAssembly
-            await micropip.install('pygame-ce');
+            await micropip.install("-r", "requirements.txt");
             console.log('Pygame CE установлен');
             
             // Загружаем код игры
@@ -429,4 +429,5 @@ js.window.gameControls = {
 </body>
 
 </html>
+
 
