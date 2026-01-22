@@ -358,7 +358,7 @@
             <span class="tech-item">WebAssembly</span>
             <span class="tech-item">GitHub Pages</span>
         </div>
-        <p style="margin-top: 15px;">© 2024 | Школьный проект по информатике</p>
+        <p style="margin-top: 15px;"> 2026 | Школьный проект по информатике</p>
     </footer>
 
     <!-- Pyodide скрипт -->
@@ -470,7 +470,7 @@
                 try {
                     await pyodide.loadPackage("micropip");
                     const micropip = pyodide.pyimport("micropip");
-                    await micropip.install("pygame-cffi");
+                    await micropip.install("pygame-sdl2");
                     console.log('✅ Pygame-CFFI установлен через micropip');
                     return true;
                 } catch (error2) {
@@ -598,4 +598,5 @@ js.window.gameControls = {
     </script>
 </body>
 </html>
+
 
