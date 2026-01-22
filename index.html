@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tiny Green Cube - Веб версия</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            font-family: 'Arial', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #4CAF50;
+            font-size: 2.5em;
+            text-shadow: 0 2px 10px rgba(76, 175, 80, 0.3);
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #aaa;
+            font-size: 1.2em;
+        }
+        
+        #game-container {
+            position: relative;
+            margin: 20px 0;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            overflow: hidden;
+            border: 3px solid #333;
+        }
+        
+        #pygame-canvas {
+            display: block;
+            background: #000;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px 40px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            text-align: center;
+            min-width: 300px;
+            z-index: 100;
+        }
+        
+        .loader {
+            border: 4px solid #333;
+            border-top: 4px solid #4CAF50;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #error {
+            display: none;
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid red;
+            color: #ff6b6b;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px;
+            max-width: 800px;
+        }
+        
+        .instructions {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            max-width: 800px;
+            text-align: left;
+        }
+        
+        .instructions h3 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+        
+        .instructions ul {
+            margin-left: 20px;
+            line-height: 1.6;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+        }
+        
+        .mobile-warning {
+            display: none;
+            background: rgba(255, 193, 7, 0.1);
+            border: 2px solid #ffc107;
+            color: #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px;
+            text-align: center;
+        }
+        
+        footer {
+            margin-top: 30px;
+            color: #666;
+            text-align: center;
+            font-size: 0.9em;
+        }
+        
+        /* Мобильное управление */
+        #mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            width: 100%;
+            max-width: 800px;
+            height: 150px;
+            pointer-events: none;
+            z-index: 50;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+        
+        .mobile-btn {
+            pointer-events: auto;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.7);
+            border: 3px solid #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            user-select: none;
+            touch-action: none;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        #btn-left {
+            background: rgba(52, 152, 219, 0.8);
+        }
+        
+        #btn-right {
+            background: rgba(155, 89, 182, 0.8);
+        }
+        
+        #btn-jump {
+            background: rgba(46, 204, 113, 0.8);
+            width: 120px;
+            height: 120px;
+            font-size: 18px;
+            padding: 10px;
+        }
+        
+        @media (max-width: 850px) {
+            #game-container {
+                transform: scale(0.9);
+            }
+            
+            .mobile-warning {
+                display: block;
+            }
+        }
+        
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            #game-container {
+                transform: scale(0.8);
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🟩 Tiny Green Cube</h1>
+        <p class="subtitle">Крошечный зеленый кубик - Веб версия</p>
+    </header>
+    
+    <div id="game-container">
+        <canvas id="pygame-canvas" width="800" height="600"></canvas>
+        <div id="loading">
+            <div class="loader"></div>
+            <p id="loading-text">Подготовка игры...</p>
+            <p style="color: #aaa; font-size: 0.9em; margin-top: 10px;">
+                Первый запуск занимает 1-2 минуты
+            </p>
+        </div>
+    </div>
+    
+    <div id="error" class="error"></div>
+    <div class="mobile-warning" id="mobile-warning">
+        📱 Используйте кнопки управления внизу экрана
+    </div>
+    
+    <!-- Мобильное управление -->
+    <div id="mobile-controls">
+        <div class="mobile-btn" id="btn-left">←</div>
+        <div class="mobile-btn" id="btn-jump">ПРЫЖОК</div>
+        <div class="mobile-btn" id="btn-right">→</div>
+    </div>
+    
+    <div class="instructions">
+        <h3>🎮 Управление:</h3>
+        <ul>
+            <li><strong>На ПК:</strong> Стрелки ← → для движения, ПРОБЕЛ для прыжка</li>
+            <li><strong>На телефоне:</strong> Используйте кнопки внизу экрана</li>
+            <li><strong>ESC:</strong> Выход из игры</li>
+        </ul>
+        <p style="margin-top: 10px; color: #4CAF50;">
+            Игра создана в рамках школьного проекта по информатике
+        </p>
+    </div>
+    
+    <footer>
+        <p>Версия 1.0 | Python + Pygame + Pyodide | 2026</p>
+        <p>Для работы требуется современный браузер (Chrome, Edge, Safari)</p>
+    </footer>
+
+    <!-- JavaScript код -->
+    <script>
+        // Проверяем, мобильное ли устройство
+        function isMobileDevice() {
+            return ('ontouchstart' in window) || 
+                   (navigator.maxTouchPoints > 0) || 
+                   (navigator.msMaxTouchPoints > 0);
+        }
+        
+        // Показываем мобильное управление
+        if (isMobileDevice()) {
+            document.getElementById('mobile-controls').style.display = 'flex';
+            document.getElementById('mobile-warning').style.display = 'block';
+        }
+        
+        // Глобальные переменные для управления
+        window.gameControls = {
+            left: false,
+            right: false,
+            jump: false
+        };
+        
+        // Настройка сенсорного управления
+        function setupMobileControls() {
+            const btnLeft = document.getElementById('btn-left');
+            const btnRight = document.getElementById('btn-right');
+            const btnJump = document.getElementById('btn-jump');
+            
+            function setKey(key, value) {
+                return function(e) {
+                    e.preventDefault();
+                    window.gameControls[key] = value;
+                    console.log(key + ' = ' + value);
+                };
+            }
+            
+            // Левая кнопка
+            btnLeft.addEventListener('touchstart', setKey('left', true));
+            btnLeft.addEventListener('touchend', setKey('left', false));
+            btnLeft.addEventListener('mousedown', setKey('left', true));
+            btnLeft.addEventListener('mouseup', setKey('left', false));
+            btnLeft.addEventListener('mouseleave', setKey('left', false));
+            
+            // Правая кнопка
+            btnRight.addEventListener('touchstart', setKey('right', true));
+            btnRight.addEventListener('touchend', setKey('right', false));
+            btnRight.addEventListener('mousedown', setKey('right', true));
+            btnRight.addEventListener('mouseup', setKey('right', false));
+            btnRight.addEventListener('mouseleave', setKey('right', false));
+            
+            // Кнопка прыжка
+            btnJump.addEventListener('touchstart', setKey('jump', true));
+            btnJump.addEventListener('touchend', setKey('jump', false));
+            btnJump.addEventListener('mousedown', setKey('jump', true));
+            btnJump.addEventListener('mouseup', setKey('jump', false));
+            btnJump.addEventListener('mouseleave', setKey('jump', false));
+            
+            console.log('Мобильное управление настроено');
+        }
+        
+        // Функция для обновления текста загрузки
+        function updateLoading(text) {
+            document.getElementById('loading-text').textContent = text;
+        }
+        
+        // Основная функция загрузки
+        async function loadGame() {
+            const loading = document.getElementById('loading');
+            const errorDiv = document.getElementById('error');
+            
+            try {
+                updateLoading('Загружаем Pyodide...');
+                
+                // Динамически импортируем Pyodide
+                const pyodideModule = await import('https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js');
+                
+                updateLoading('Инициализируем Python...');
+                const pyodide = await pyodideModule.loadPyodide();
+                
+                updateLoading('Загружаем менеджер пакетов...');
+                await pyodide.loadPackage("micropip");
+                const micropip = pyodide.pyimport("micropip");
+                
+                updateLoading('Устанавливаем Pygame (это займет ~1 минуту)...');
+                await micropip.install("pygame");
+                
+                updateLoading('Загружаем код игры...');
+                const response = await fetch('game.py');
+                if (!response.ok) {
+                    throw new Error(`Ошибка загрузки game.py: ${response.status}`);
+                }
+                const gameCode = await response.text();
+                
+                // Настраиваем управление
+                setupMobileControls();
+                
+                // Добавляем глобальные переменные для игры
+                pyodide.runPython(`
+                import js
+                js.window.gameControls = {
+                    'left': False,
+                    'right': False,
+                    'jump': False
+                }
+                `);
+                
+                updateLoading('Запускаем игру...');
+                await pyodide.runPythonAsync(gameCode);
+                
+                // Скрываем загрузку
+                setTimeout(() => {
+                    loading.style.opacity = '0';
+                    setTimeout(() => {
+                        loading.style.display = 'none';
+                    }, 500);
+                }, 1000);
+                
+                console.log('Игра успешно запущена!');
+                
+            } catch (error) {
+                console.error('Ошибка загрузки:', error);
+                errorDiv.textContent = 'Ошибка: ' + error.message;
+                errorDiv.style.display = 'block';
+                updateLoading('Ошибка загрузки игры');
+            }
+        }
+        
+        // Запускаем игру при загрузке страницы
+        window.addEventListener('DOMContentLoaded', loadGame);
+        
+        // Открытие ссылок из Python
+        window.open = function(url) {
+            window.open(url, '_blank');
+        };
+    </script>
+</body>
+</html>
