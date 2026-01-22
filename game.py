@@ -1,4 +1,4 @@
-import pygameweb as pygame
+import pygame_sdl2 as pygame
 import random
 import webbrowser
 import os
@@ -684,3 +684,4 @@ while running:
 
 
 pygame.quit()
+
