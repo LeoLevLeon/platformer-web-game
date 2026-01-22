@@ -251,138 +251,179 @@
 
     <!-- JavaScript код -->
     <script>
-        // Проверяем, мобильное ли устройство
-        function isMobileDevice() {
-            return ('ontouchstart' in window) || 
-                   (navigator.maxTouchPoints > 0) || 
-                   (navigator.msMaxTouchPoints > 0);
+    // Показываем загрузку
+    const loading = document.getElementById('loading');
+    const errorDiv = document.getElementById('error');
+    
+    // Проверяем, мобильное ли устройство
+    function isMobileDevice() {
+        return ('ontouchstart' in window) || 
+               (navigator.maxTouchPoints > 0) || 
+               (navigator.msMaxTouchPoints > 0);
+    }
+    
+    // Показываем мобильное управление
+    if (isMobileDevice()) {
+        document.getElementById('mobile-controls').style.display = 'flex';
+        document.getElementById('mobile-warning').style.display = 'block';
+    }
+    
+    // Глобальные переменные для управления
+    window.gameControls = {
+        left: false,
+        right: false,
+        jump: false
+    };
+    
+    // Настройка сенсорного управления
+    function setupMobileControls() {
+        const btnLeft = document.getElementById('btn-left');
+        const btnRight = document.getElementById('btn-right');
+        const btnJump = document.getElementById('btn-jump');
+        
+        function setKey(key, value) {
+            return function(e) {
+                e.preventDefault();
+                window.gameControls[key] = value;
+                console.log(key + ' = ' + value);
+            };
         }
         
-        // Показываем мобильное управление
-        if (isMobileDevice()) {
-            document.getElementById('mobile-controls').style.display = 'flex';
-            document.getElementById('mobile-warning').style.display = 'block';
-        }
+        // Левая кнопка
+        btnLeft.addEventListener('touchstart', setKey('left', true));
+        btnLeft.addEventListener('touchend', setKey('left', false));
+        btnLeft.addEventListener('mousedown', setKey('left', true));
+        btnLeft.addEventListener('mouseup', setKey('left', false));
+        btnLeft.addEventListener('mouseleave', setKey('left', false));
         
-        // Глобальные переменные для управления
-        window.gameControls = {
-            left: false,
-            right: false,
-            jump: false
-        };
+        // Правая кнопка
+        btnRight.addEventListener('touchstart', setKey('right', true));
+        btnRight.addEventListener('touchend', setKey('right', false));
+        btnRight.addEventListener('mousedown', setKey('right', true));
+        btnRight.addEventListener('mouseup', setKey('right', false));
+        btnRight.addEventListener('mouseleave', setKey('right', false));
         
-        // Настройка сенсорного управления
-        function setupMobileControls() {
-            const btnLeft = document.getElementById('btn-left');
-            const btnRight = document.getElementById('btn-right');
-            const btnJump = document.getElementById('btn-jump');
+        // Кнопка прыжка
+        btnJump.addEventListener('touchstart', setKey('jump', true));
+        btnJump.addEventListener('touchend', setKey('jump', false));
+        btnJump.addEventListener('mousedown', setKey('jump', true));
+        btnJump.addEventListener('mouseup', setKey('jump', false));
+        btnJump.addEventListener('mouseleave', setKey('jump', false));
+        
+        console.log('Мобильное управление настроено');
+    }
+    
+    // Функция для обновления текста загрузки
+    function updateLoading(text) {
+        document.getElementById('loading-text').textContent = text;
+    }
+    
+    // Основная функция загрузки - ИСПРАВЛЕННАЯ ВЕРСИЯ
+    async function loadGame() {
+        try {
+            updateLoading('Загружаем Pyodide...');
             
-            function setKey(key, value) {
-                return function(e) {
-                    e.preventDefault();
-                    window.gameControls[key] = value;
-                    console.log(key + ' = ' + value);
-                };
+            // ПРЯМОЕ ПОДКЛЮЧЕНИЕ Pyodide (новый API)
+            let pyodide;
+            if (window.loadPyodide) {
+                // Способ 1: Pyodide уже загружен
+                pyodide = await loadPyodide();
+            } else {
+                // Способ 2: Загружаем через script тег
+                await new Promise((resolve) => {
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js';
+                    script.onload = resolve;
+                    document.head.appendChild(script);
+                });
+                pyodide = await loadPyodide();
             }
             
-            // Левая кнопка
-            btnLeft.addEventListener('touchstart', setKey('left', true));
-            btnLeft.addEventListener('touchend', setKey('left', false));
-            btnLeft.addEventListener('mousedown', setKey('left', true));
-            btnLeft.addEventListener('mouseup', setKey('left', false));
-            btnLeft.addEventListener('mouseleave', setKey('left', false));
+            updateLoading('Инициализируем Python...');
             
-            // Правая кнопка
-            btnRight.addEventListener('touchstart', setKey('right', true));
-            btnRight.addEventListener('touchend', setKey('right', false));
-            btnRight.addEventListener('mousedown', setKey('right', true));
-            btnRight.addEventListener('mouseup', setKey('right', false));
-            btnRight.addEventListener('mouseleave', setKey('right', false));
+            // Загружаем micropip
+            updateLoading('Загружаем менеджер пакетов...');
+            await pyodide.loadPackage("micropip");
             
-            // Кнопка прыжка
-            btnJump.addEventListener('touchstart', setKey('jump', true));
-            btnJump.addEventListener('touchend', setKey('jump', false));
-            btnJump.addEventListener('mousedown', setKey('jump', true));
-            btnJump.addEventListener('mouseup', setKey('jump', false));
-            btnJump.addEventListener('mouseleave', setKey('jump', false));
+            // Устанавливаем pygame
+            updateLoading('Устанавливаем Pygame (это займет ~1 минуту)...');
+            const micropip = pyodide.pyimport("micropip");
+            await micropip.install("pygame");
             
-            console.log('Мобильное управление настроено');
-        }
-        
-        // Функция для обновления текста загрузки
-        function updateLoading(text) {
-            document.getElementById('loading-text').textContent = text;
-        }
-        
-        // Основная функция загрузки
-        async function loadGame() {
-            const loading = document.getElementById('loading');
-            const errorDiv = document.getElementById('error');
-            
+            // Загружаем код игры
+            updateLoading('Загружаем код игры...');
+            let response;
             try {
-                updateLoading('Загружаем Pyodide...');
-                
-                // Динамически импортируем Pyodide
-                const pyodideModule = await import('https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js');
-                
-                updateLoading('Инициализируем Python...');
-                const pyodide = await pyodideModule.loadPyodide();
-                
-                updateLoading('Загружаем менеджер пакетов...');
-                await pyodide.loadPackage("micropip");
-                const micropip = pyodide.pyimport("micropip");
-                
-                updateLoading('Устанавливаем Pygame (это займет ~1 минуту)...');
-                await micropip.install("pygame");
-                
-                updateLoading('Загружаем код игры...');
-                const response = await fetch('game.py');
-                if (!response.ok) {
-                    throw new Error(`Ошибка загрузки game.py: ${response.status}`);
-                }
-                const gameCode = await response.text();
-                
-                // Настраиваем управление
-                setupMobileControls();
-                
-                // Добавляем глобальные переменные для игры
-                pyodide.runPython(`
-                import js
-                js.window.gameControls = {
-                    'left': False,
-                    'right': False,
-                    'jump': False
-                }
-                `);
-                
-                updateLoading('Запускаем игру...');
-                await pyodide.runPythonAsync(gameCode);
-                
-                // Скрываем загрузку
-                setTimeout(() => {
-                    loading.style.opacity = '0';
-                    setTimeout(() => {
-                        loading.style.display = 'none';
-                    }, 500);
-                }, 1000);
-                
-                console.log('Игра успешно запущена!');
-                
-            } catch (error) {
-                console.error('Ошибка загрузки:', error);
-                errorDiv.textContent = 'Ошибка: ' + error.message;
-                errorDiv.style.display = 'block';
-                updateLoading('Ошибка загрузки игры');
+                response = await fetch('game.py');
+            } catch (e) {
+                // Пробуем альтернативный путь
+                response = await fetch('./game.py');
             }
+            
+            if (!response.ok) {
+                throw new Error(`Ошибка загрузки game.py: ${response.status}`);
+            }
+            
+            const gameCode = await response.text();
+            console.log("Код игры загружен, длина:", gameCode.length);
+            
+            // Настраиваем управление
+            setupMobileControls();
+            
+            // Передаем объект управления в Python
+            pyodide.runPython(`
+import js
+js.window.gameControls = {
+    'left': False,
+    'right': False,
+    'jump': False
+}
+`);
+            
+            // Запускаем игру
+            updateLoading('Запускаем игру...');
+            await pyodide.runPythonAsync(gameCode);
+            
+            // Успех!
+            updateLoading('Игра запущена!');
+            loading.style.color = '#4CAF50';
+            
+            // Скрываем загрузку через 2 секунды
+            setTimeout(() => {
+                loading.style.opacity = '0';
+                setTimeout(() => {
+                    loading.style.display = 'none';
+                }, 500);
+            }, 2000);
+            
+        } catch (error) {
+            console.error('Ошибка загрузки:', error);
+            errorDiv.textContent = 'Ошибка: ' + error.message;
+            errorDiv.style.display = 'block';
+            updateLoading('Ошибка загрузки игры');
+            
+            // Показываем дополнительные детали
+            const details = document.createElement('div');
+            details.innerHTML = `
+                <p style="margin-top: 10px; font-size: 14px;">
+                    Проверьте:<br>
+                    1. Файл game.py есть на GitHub<br>
+                    2. Звуки в формате .wav, а не .mp3<br>
+                    3. Консоль браузера (F12) для подробностей
+                </p>
+            `;
+            errorDiv.appendChild(details);
         }
-        
-        // Запускаем игру при загрузке страницы
-        window.addEventListener('DOMContentLoaded', loadGame);
-        
-        // Открытие ссылок из Python
-        window.open = function(url) {
-            window.open(url, '_blank');
-        };
+    }
+    
+    // Функция для открытия ссылок из Python
+    window.openUrl = function(url) {
+        window.open(url, '_blank');
+    };
+    
+    // Запускаем игру при загрузке страницы
+    document.addEventListener('DOMContentLoaded', loadGame);
     </script>
 </body>
+
 </html>
