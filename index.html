@@ -470,8 +470,8 @@
                 try {
                     await pyodide.loadPackage("micropip");
                     const micropip = pyodide.pyimport("micropip");
-                    await micropip.install("pygame-sdl2");
-                    console.log('✅ Pygame-CFFI установлен через micropip');
+                    await micropip.install("pygame-wed");
+                    console.log('✅ Pygame-web установлен через micropip');
                     return true;
                 } catch (error2) {
                     throw new Error(`Не удалось загрузить Pygame: ${error2.message}`);
@@ -598,5 +598,6 @@ js.window.gameControls = {
     </script>
 </body>
 </html>
+
 
 
