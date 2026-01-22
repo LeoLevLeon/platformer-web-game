@@ -458,7 +458,7 @@
             updateLoading('Загружаем игровой движок...', 'Установка pygame через Pyodide');
             
             try {
-                // ВАЖНО: Используем loadPackage, а не micropip!
+                // Используем loadPackage
                 await pyodide.loadPackage(["pygame"]);
                 console.log('✅ Pygame загружен через loadPackage');
                 return true;
@@ -470,8 +470,8 @@
                 try {
                     await pyodide.loadPackage("micropip");
                     const micropip = pyodide.pyimport("micropip");
-                    await micropip.install("pygame-ce");
-                    console.log('✅ Pygame-CE установлен через micropip');
+                    await micropip.install("pygame-cffi");
+                    console.log('✅ Pygame-CFFI установлен через micropip');
                     return true;
                 } catch (error2) {
                     throw new Error(`Не удалось загрузить Pygame: ${error2.message}`);
@@ -598,3 +598,4 @@ js.window.gameControls = {
     </script>
 </body>
 </html>
+
