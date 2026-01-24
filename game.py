@@ -1,10 +1,94 @@
-import pygameweb as pygame
-import random
-import webbrowser
+# ========== СПЕЦИАЛЬНАЯ НАСТРОЙКА ДЛЯ БРАУЗЕРА ==========
+import sys
 import os
 
-# Базовый путь для ресурсов
-BASE_PATH = "assets/"
+# Определяем, работаем ли мы в браузере
+IN_BROWSER = "pyodide" in sys.modules
+
+if IN_BROWSER:
+    print("=== ЗАПУСК В БРАУЗЕРЕ ===")
+    
+    # Специальная настройка для Pygame в Pyodide
+    os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+    
+    # Импортируем pygame-ce
+    try:
+        import pygame
+        print(f"Pygame версия: {pygame.version.ver}")
+        
+        # Специальная инициализация для браузера
+        pygame.init()
+        pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
+        
+    except Exception as e:
+        print(f"Ошибка импорта pygame: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    # Настройка путей для ресурсов
+    BASE_PATH = "./"
+    
+    # Функции для загрузки ресурсов в браузере
+    def load_image_web(filename):
+        try:
+            from pygame import image
+            # В браузере пути работают по-другому
+            try:
+                return image.load("assets/images/" + filename)
+            except:
+                # Если не получилось, создаем заглушку
+                print(f"Не удалось загрузить изображение: {filename}")
+                surf = pygame.Surface((50, 50))
+                if "player" in filename:
+                    surf.fill((0, 255, 0))  # зеленый для игрока
+                elif "saw" in filename:
+                    surf.fill((255, 0, 0))  # красный для пилы
+                elif "coin" in filename:
+                    surf.fill((255, 255, 0))  # желтый для монеты
+                elif "spike" in filename:
+                    surf.fill((128, 128, 128))  # серый для шипов
+                else:
+                    surf.fill((255, 255, 255))  # белый для остального
+                return surf
+        except Exception as e:
+            print(f"Ошибка загрузки изображения {filename}: {e}")
+            return pygame.Surface((50, 50))
+    
+    def load_sound_web(filename):
+        # В браузере звук может не работать, создаем заглушки
+        print(f"Звук {filename} не доступен в браузере")
+        class DummySound:
+            def play(self): 
+                print(f"Воспроизведение звука: {filename}")
+            def stop(self): pass
+            def set_volume(self, vol): pass
+        return DummySound()
+    
+    # Используем веб-версии функций
+    load_image = load_image_web
+    load_sound = load_sound_web
+    
+    print("Настройка для браузера завершена")
+    
+else:
+    # Обычная загрузка для десктопа
+    print("=== ЗАПУСК НА ДЕСКТОПЕ ===")
+    import pygame
+    pygame.init()
+    pygame.mixer.init()
+    
+    BASE_PATH = "assets/"
+    
+    def load_image(filename):
+        return pygame.image.load(os.path.join(BASE_PATH, "images", filename))
+    
+    def load_sound(filename):
+        return pygame.mixer.Sound(os.path.join(BASE_PATH, "sounds", filename))
+
+# ========== ОСНОВНОЙ КОД ИГРЫ ==========
+
+import random
+import webbrowser
 
 try:
     import js
@@ -13,10 +97,6 @@ except:
     print("js load error")
     pass
 
-
-# Инициализация Pygame
-pygame.init()
-pygame.mixer.init()
 
 # Константы-параметры окна
 WIDTH = 800
@@ -32,12 +112,6 @@ fullscreen = False
 score = 0
 number_of_button = 0
 sound_play = True
-
-def load_image(filename):
-    return pygame.image.load(os.path.join(BASE_PATH, "images", filename))
-
-def load_sound(filename):
-    return pygame.mixer.Sound(os.path.join(BASE_PATH, "sounds", filename))
 
 # Класс для игрока
 class Player(pygame.sprite.Sprite):
@@ -411,9 +485,20 @@ def handle_input(player, jump_sound_obj, sound_enabled):
 # ===============================================
     
 
+# Создаем экран - специальная обработка для браузера
+try:
+    if IN_BROWSER:
+        # В браузере используем специальный canvas
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        print("Экран Pygame создан в браузере")
+    else:
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+except Exception as e:
+    print(f"Ошибка создания экрана: {e}")
+    # Создаем заглушку
+    screen = pygame.Surface((WIDTH, HEIGHT))
 
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Платформер")
+pygame.display.set_caption("Платформер - Веб версия")
 clock = pygame.time.Clock()
 
 # Создаем шрифт для отображения счета и уровня
@@ -476,38 +561,62 @@ def load_level(level):
     for button in buttons_list:
         buttons_sprite_group.add(button)
 
-bg_1 = load_image("bg_and_sprites/bg_1.png")
-bg_2 = load_image("bg_and_sprites/bg_2.png")
-bg_3 = load_image("bg_and_sprites/bg_3.png")
-bg_4 = load_image("bg_and_sprites/bg_4.png")
-bg_5 = load_image("bg_and_sprites/bg_5.png")
-bg_6 = load_image("bg_and_sprites/bg_6.png")
-bg_7 = load_image("bg_and_sprites/bg_7.png")
-
-jump_sound = load_sound("sounds_and_music/Jump_sound_1.mp3")
-coin_sound = load_sound("sounds_and_music/moneta.mp3")
-death_sound = load_sound("sounds_and_music/Hit_sound_3.mp3")
-win_sound = load_sound("sounds_and_music/New_level_sound.mp3")
-button_sound = load_sound("sounds_and_music/Push_button.mp3")
-menu_music = load_sound("sounds_and_music/Beep-beep_melody.mp3")
-end_music = load_sound("sounds_and_music/Game_end_song.mp3")
-level_song_1 = load_sound("sounds_and_music/Cool_song.mp3")
-level_song_2 = load_sound("sounds_and_music/Happ_song.mp3")
-level_song_3 = load_sound("sounds_and_music/Game_song.mp3")
-level_song_4 = load_sound("sounds_and_music/Fon_song.mp3")
-level_song_5 = load_sound("sounds_and_music/fon.mp3")
+# Загружаем ресурсы - с обработкой ошибок для браузера
+try:
+    bg_1 = load_image("bg_and_sprites/bg_1.png")
+    bg_2 = load_image("bg_and_sprites/bg_2.png")
+    bg_3 = load_image("bg_and_sprites/bg_3.png")
+    bg_4 = load_image("bg_and_sprites/bg_4.png")
+    bg_5 = load_image("bg_and_sprites/bg_5.png")
+    bg_6 = load_image("bg_and_sprites/bg_6.png")
+    bg_7 = load_image("bg_and_sprites/bg_7.png")
+    
+    jump_sound = load_sound("sounds_and_music/Jump_sound_1.mp3")
+    coin_sound = load_sound("sounds_and_music/moneta.mp3")
+    death_sound = load_sound("sounds_and_music/Hit_sound_3.mp3")
+    win_sound = load_sound("sounds_and_music/New_level_sound.mp3")
+    button_sound = load_sound("sounds_and_music/Push_button.mp3")
+    menu_music = load_sound("sounds_and_music/Beep-beep_melody.mp3")
+    end_music = load_sound("sounds_and_music/Game_end_song.mp3")
+    level_song_1 = load_sound("sounds_and_music/Cool_song.mp3")
+    level_song_2 = load_sound("sounds_and_music/Happ_song.mp3")
+    level_song_3 = load_sound("sounds_and_music/Game_song.mp3")
+    level_song_4 = load_sound("sounds_and_music/Fon_song.mp3")
+    level_song_5 = load_sound("sounds_and_music/fon.mp3")
+except Exception as e:
+    print(f"Ошибка загрузки ресурсов: {e}")
+    # Создаем заглушки для ресурсов
+    bg_1 = bg_2 = bg_3 = bg_4 = bg_5 = bg_6 = bg_7 = pygame.Surface((WIDTH, HEIGHT))
+    bg_1.fill((100, 100, 200))
+    bg_2.fill((200, 100, 100))
+    bg_3.fill((100, 200, 100))
+    bg_4.fill((200, 200, 100))
+    bg_5.fill((100, 200, 200))
+    bg_6.fill((200, 100, 200))
+    bg_7.fill((150, 150, 150))
+    
+    # Заглушки для звуков
+    class DummySound:
+        def play(self): pass
+        def stop(self): pass
+        def set_volume(self, vol): pass
+    
+    jump_sound = coin_sound = death_sound = win_sound = button_sound = DummySound()
+    menu_music = end_music = level_song_1 = level_song_2 = level_song_3 = level_song_4 = level_song_5 = DummySound()
 
 
 
 # Основной игровой цикл
 running = True
+print("Начинаем игровой цикл...")
+
 while running:
     # Обработка событий
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE and player_sprite.on_ground == True :
+            if event.key == pygame.K_SPACE and player_sprite and player_sprite.on_ground == True :
                 jump_sound.play()
                 player_sprite.y_velocity = -7
                 player_sprite.on_ground = False
@@ -516,7 +625,7 @@ while running:
             
             if not game_started:
 
-                if button_1.is_over(pygame.mouse.get_pos()):
+                if button_1 and button_1.is_over(pygame.mouse.get_pos()):
                     button_sound.play()
                     current_level += 1
                     load_level(current_level)
@@ -525,16 +634,19 @@ while running:
                     button_3 = None
                     game_started = True
                 
-                elif button_2.is_over(pygame.mouse.get_pos()):
+                elif button_2 and button_2.is_over(pygame.mouse.get_pos()):
                     button_sound.play()
                     if not fullscreen:
-                        screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN) 
+                        # В браузере полноэкранный режим работает по-другому
+                        if not IN_BROWSER:
+                            screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN) 
                         fullscreen = True
                     else:
-                        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+                        if not IN_BROWSER:
+                            screen = pygame.display.set_mode((WIDTH, HEIGHT))
                         fullscreen = False
                 
-                elif button_3.is_over(pygame.mouse.get_pos()):
+                elif button_3 and button_3.is_over(pygame.mouse.get_pos()):
                     button_sound.play()
                     if not sound_play:
                         sound_play = True
@@ -542,7 +654,7 @@ while running:
                         sound_play = False
 
             elif game_completed:
-                if button_4.is_over(pygame.mouse.get_pos()):
+                if button_4 and button_4.is_over(pygame.mouse.get_pos()):
                     webbrowser.open("https://t.me/Infoplatformer_bot")
 
 
@@ -572,8 +684,9 @@ while running:
         button_4 = Button(325, 375, "#2067c8", "#528af2", "Ссылка на бота")
         screen.blit(completion_text, (WIDTH//2 - completion_text.get_width()//2, HEIGHT//2 - 50))
         screen.blit(score_text, (WIDTH//2 - score_text.get_width()//2, HEIGHT//2 + 10))
-        button_4.update_hover(pygame.mouse.get_pos())
-        button_4.draw_button(screen)
+        if button_4:
+            button_4.update_hover(pygame.mouse.get_pos())
+            button_4.draw_button(screen)
         pygame.display.flip()
         
         # Ждем нажатия клавиши для выхода
@@ -615,22 +728,25 @@ while running:
         menu_music.stop()
 
     # Управление
-
-    handle_input(player_sprite, jump_sound, sound_play)
+    if player_sprite:
+        handle_input(player_sprite, jump_sound, sound_play)
 
     # Гравитация
-    player_sprite.y_velocity += 0.3
+    if player_sprite:
+        player_sprite.y_velocity += 0.3
     
     # Обновление
-    player_sprite.update()
+    if player_sprite:
+        player_sprite.update()
     enemies.update()
 
     
     
     # Проверка коллизий
-    check_collision_platforms(player_sprite, platforms_list)
-    check_collision_enemies(player_sprite, enemies_list)
-    check_collision_collectibles(player_sprite, collectibles_list)
+    if player_sprite:
+        check_collision_platforms(player_sprite, platforms_list)
+        check_collision_enemies(player_sprite, enemies_list)
+        check_collision_collectibles(player_sprite, collectibles_list)
     
 
     # Проверка завершения уровня
@@ -666,7 +782,8 @@ while running:
     platforms.draw(screen)
     enemies.draw(screen)
     collectibles.draw(screen)
-    player_sprite_group.draw(screen)
+    if player_sprite_group:
+        player_sprite_group.draw(screen)
 
     # Отображение счёта и уровня
     score_text = font.render(f"Счёт: {score}", True, "black")
@@ -677,12 +794,15 @@ while running:
 
     
     # Обновление экрана
-    pygame.display.flip()
+    try:
+        pygame.display.flip()
+    except Exception as e:
+        print(f"Ошибка обновления экрана: {e}")
+        running = False
     
     # Установка частоты кадров
     clock.tick(FPS)
 
 
 pygame.quit()
-
-
+print("Игра завершена")
