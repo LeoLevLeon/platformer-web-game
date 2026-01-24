@@ -362,14 +362,14 @@
     </footer>
 
     <!-- Pyodide скрипт -->
-    <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script>
     
     <script>
         // ========== КОНФИГУРАЦИЯ ==========
         const CONFIG = {
             gameFile: 'game.py',
             canvasId: 'game-canvas',
-            loadingTime: 3000 // мин. время показа загрузки (мс)
+            loadingTime: 3000
         };
         
         // ========== ПЕРЕМЕННЫЕ ==========
@@ -385,6 +385,7 @@
         const errorDetails = document.getElementById('error-details');
         const mobileControls = document.getElementById('mobile-controls');
         const mobileWarning = document.getElementById('mobile-warning');
+        const gameCanvas = document.getElementById('game-canvas');
         
         // ========== ОБЩИЕ ФУНКЦИИ ==========
         function updateLoading(text, subtext = '') {
@@ -433,7 +434,6 @@
                 
                 const key = btnId.replace('btn-', '');
                 
-                // Функция для изменения состояния
                 function setState(value) {
                     return function(e) {
                         e.preventDefault();
@@ -442,12 +442,12 @@
                     };
                 }
                 
-                // События для мыши и касаний
                 btn.addEventListener('mousedown', setState(true));
                 btn.addEventListener('mouseup', setState(false));
                 btn.addEventListener('mouseleave', setState(false));
                 btn.addEventListener('touchstart', setState(true));
                 btn.addEventListener('touchend', setState(false));
+                btn.addEventListener('touchcancel', setState(false));
             });
             
             console.log('Мобильное управление настроено');
@@ -455,34 +455,36 @@
         
         // ========== ЗАГРУЗКА PYGAME ==========
         async function loadPygame(pyodide) {
-            updateLoading('Загружаем игровой движок...', 'Установка pygame через Pyodide');
+            updateLoading('Загружаем игровой движок...', 'Установка pygame через micropip');
             
             try {
-                // Используем loadPackage
-                await pyodide.loadPackage(["pygame-sdl2"]);
-                console.log('✅ Pygame загружен через loadPackage');
-                return true;
-            } catch (error) {
-                console.warn('Первый способ не сработал:', error);
+                // Загружаем micropip
+                await pyodide.loadPackage("micropip");
                 
-                // Пробуем альтернативный способ
-                updateLoading('Пробуем альтернативную установку...');
-                try {
-                    await pyodide.loadPackage("micropip");
-                    const micropip = pyodide.pyimport("micropip");
-                    await micropip.install("pygame-web");
-                    console.log('✅ Pygame-web установлен через micropip');
-                    return true;
-                } catch (error2) {
-                    throw new Error(`Не удалось загрузить Pygame: ${error2.message}`);
-                }
+                // Устанавливаем pygame через micropip
+                const micropip = pyodide.pyimport("micropip");
+                
+                // Используем правильную версию pygame для Pyodide
+                updateLoading('Устанавливаем pygame...', 'Это может занять 30-60 секунд');
+                
+                // Устанавливаем pygame-ce (современная версия)
+                await micropip.install("pygame-ce");
+                
+                console.log('✅ Pygame-CE успешно установлен');
+                return true;
+                
+            } catch (error) {
+                console.error('Ошибка установки pygame:', error);
+                throw new Error(`Не удалось загрузить Pygame: ${error.message}`);
             }
         }
         
         // ========== ЗАГРУЗКА ИГРЫ ==========
         async function loadGameCode() {
             try {
-                const response = await fetch(CONFIG.gameFile);
+                // Добавляем таймстамп, чтобы избежать кэширования
+                const timestamp = new Date().getTime();
+                const response = await fetch(`${CONFIG.gameFile}?t=${timestamp}`);
                 if (!response.ok) {
                     throw new Error(`Файл ${CONFIG.gameFile} не найден (код: ${response.status})`);
                 }
@@ -497,9 +499,15 @@
             updateLoading('Инициализируем Pyodide...', 'Загрузка Python в браузер');
             
             try {
-                // Создаем Pyodide
+                // Более новая версия Pyodide
                 const pyodide = await loadPyodide({
-                    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/"
+                    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.1/full/",
+                    stdout: (text) => {
+                        console.log('Python:', text);
+                    },
+                    stderr: (text) => {
+                        console.error('Python ошибка:', text);
+                    }
                 });
                 
                 console.log('✅ Pyodide инициализирован');
@@ -507,6 +515,16 @@
             } catch (error) {
                 throw new Error(`Ошибка инициализации Pyodide: ${error.message}`);
             }
+        }
+        
+        // ========== НАСТРОЙКА КАНВАСА ==========
+        function setupCanvasForPygame() {
+            // Очищаем канвас
+            const ctx = gameCanvas.getContext('2d');
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+            
+            console.log('Канвас подготовлен для Pygame');
         }
         
         // ========== ОСНОВНАЯ ФУНКЦИЯ ==========
@@ -517,68 +535,79 @@
             const startTime = Date.now();
             
             try {
-                // 1. Инициализация Pyodide
-                updateLoading('Подготовка среды выполнения...');
-                pyodideInstance = await initializePyodide();
+                // 1. Подготовка канваса
+                setupCanvasForPygame();
                 
-                // 2. Загрузка Pygame
-                await loadPygame(pyodideInstance);
+                // 2. Инициализация Pyodide
+                updateLoading('Подготовка среды выполнения...', 'Pyodide 0.25.1');
+                pyodideInstance = await initializePyodide();
                 
                 // 3. Настройка управления
                 setupMobileControls();
                 
-                // 4. Передача управления в Python
+                // 4. Загрузка Pygame
+                await loadPygame(pyodideInstance);
+                
+                // 5. Загружаем необходимые пакеты
+                updateLoading('Загружаем дополнительные пакеты...');
+                await pyodideInstance.loadPackage(["numpy"]);
+                
+                // 6. Настраиваем глобальные переменные для Python
                 pyodideInstance.runPython(`
 import js
-js.window.gameControls = {
-    'left': False,
-    'right': False,
-    'jump': False
-}
+import sys
+import io
+
+# Настройка вывода
+class JSCapture:
+    def write(self, data):
+        if data.strip():
+            js.console.log("Python:", data)
+    def flush(self):
+        pass
+
+sys.stdout = JSCapture()
+sys.stderr = JSCapture()
 `);
                 
-                // 5. Загрузка кода игры
-                updateLoading('Загружаем код игры...');
+                // 7. Загрузка кода игры
+                updateLoading('Компилируем игру...');
                 const gameCode = await loadGameCode();
                 console.log(`📦 Код игры загружен (${gameCode.length} символов)`);
                 
-                // 6. Запуск игры
-                updateLoading('Запускаем игру...', 'Ожидайте появления игрового окна');
+                // 8. Запуск игры
+                updateLoading('Запускаем игру...', 'Последние приготовления');
+                
+                // Запускаем код игры
                 await pyodideInstance.runPythonAsync(gameCode);
                 
-                // 7. Успех!
+                // 9. Успех!
                 const loadTime = Date.now() - startTime;
                 console.log(`✅ Игра успешно запущена за ${loadTime}мс`);
                 
-                // Ждем минимальное время загрузки
-                const remainingTime = CONFIG.loadingTime - loadTime;
-                if (remainingTime > 0) {
-                    updateLoading('Завершаем настройку...');
-                    await new Promise(resolve => setTimeout(resolve, remainingTime));
-                }
-                
                 updateLoading('Игра запущена!', 'Приятной игры!');
-                setTimeout(hideLoading, 1000);
+                setTimeout(hideLoading, 1500);
                 
             } catch (error) {
+                console.error("Полная ошибка запуска:", error);
                 showError(
                     `Ошибка запуска игры: ${error.message}`,
                     'Проверьте консоль браузера (F12) для подробностей'
                 );
                 updateLoading('Ошибка загрузки', '');
                 
-                // Детали для отладки
                 errorDetails.innerHTML += `
                     <p><strong>Что проверить:</strong></p>
-                    <p>1. Файл <code>game.py</code> есть на GitHub</p>
-                    <p>2. В коде нет синтаксических ошибок</p>
-                    <p>3. Попробуйте обновить страницу</p>
-                    <p>4. Используйте браузер Chrome или Edge</p>
+                    <p>1. Убедитесь, что файл <code>game.py</code> загружен на GitHub</p>
+                    <p>2. Проверьте консоль браузера (F12) на наличие ошибок</p>
+                    <p>3. Попробуйте обновить страницу (Ctrl+F5)</p>
+                    <p>4. Используйте последние версии Chrome или Edge</p>
+                    <p>5. Проверьте интернет-соединение</p>
                 `;
             }
         }
         
-        // ========== ГЛОБАЛЬНЫЕ ФУНКЦИИ ДЛЯ PYTHON ==========
+        // ========== ГЛОБАЛЬНЫЕ ФУНКЦИИ ==========
         window.openUrl = function(url) {
             window.open(url, '_blank');
         };
@@ -586,19 +615,23 @@ js.window.gameControls = {
         // ========== ЗАПУСК ПРИ ЗАГРУЗКЕ СТРАНИЦЫ ==========
         document.addEventListener('DOMContentLoaded', () => {
             // Небольшая задержка для отображения интерфейса
-            setTimeout(startGame, 500);
+            setTimeout(() => {
+                console.log('Начинаем загрузку игры...');
+                startGame();
+            }, 1000);
         });
         
-        // ========== КНОПКА ПЕРЕЗАГРУЗКИ (для отладки) ==========
+        // ========== ДЛЯ ОТЛАДКИ ==========
         window.restartGame = function() {
             if (confirm('Перезагрузить игру?')) {
                 location.reload();
             }
         };
+        
+        console.log('Страница загружена, начинаем инициализацию');
     </script>
 </body>
 </html>
-
 
 
 
